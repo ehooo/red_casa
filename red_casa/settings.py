@@ -37,7 +37,7 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'red_casa.dhcp',
-    'red_casa.dns',
+    # 'red_casa.dns',
 )
 
 MIDDLEWARE_CLASSES = (

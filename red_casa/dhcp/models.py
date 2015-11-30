@@ -66,10 +66,12 @@ class DHCPOption(models.Model):
     value = models.TextField()
 
     def __unicode__(self):
-        return "(%s, %s)" % (self.option, self.value)
+        option = dict(DHCP_OPTIONS)[self.option]
+        return "(%s, %s)" % (option, self.value)
 
     def __str__(self):
-        return "(%s, %s)" % (self.option, self.value)
+        option = dict(DHCP_OPTIONS)[self.option]
+        return "(%s, %s)" % (option, self.value)
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if self.option in [HOSTNAME, DOMAIN]:  # Valid string
@@ -85,7 +87,7 @@ class DHCPOption(models.Model):
         elif self.option == LEASE_TIME:  # Valid unigned int
             if int(self.value) < 0:
                 raise ValueError('value must be unsigned int')
-        super(models.Model, self).save(force_insert, force_update, using, update_fields)
+        super(DHCPOption, self).save(force_insert, force_update, using, update_fields)
 
     def get_value(self):
         if self.option in [ROUTER, TIME_SERVER, NAME_SERVER, LOG_SERVER, COOKIE_SERVER, NTP_SERVER,
@@ -105,7 +107,7 @@ class DHCPNetwork(models.Model):
     subnet_mask = models.CharField(max_length=20)
     name_server = models.CharField(max_length=255)
     domain = models.CharField(max_length=255, default='local')
-    options = models.ManyToManyField(DHCPOption)
+    options = models.ManyToManyField(DHCPOption, blank=True, null=True)
 
     class Meta:
         unique_together = ('router', 'subnet_mask')
@@ -125,10 +127,10 @@ class DHCPNetwork(models.Model):
             raise ValueError('Only one network is allowed')
         for ip in self.name_server.split(DHCP_IP_LIST_SEPARATOR):
             ipaddr.IPAddress(ip)
-        super(models.Model, self).save(force_insert, force_update, using, update_fields)
+        super(DHCPNetwork, self).save(force_insert, force_update, using, update_fields)
 
 
-class DHCPip(models.Model):
+class DHCPIp(models.Model):
     network = models.ForeignKey(DHCPNetwork)
     address = models.CharField(max_length=20)
 
@@ -151,7 +153,7 @@ class DHCPip(models.Model):
                 raise ValueError('Router IP is not allowed')
         if ip not in ipaddr.IPNetwork("%s/%s" % (one_router, self.network.subnet_mask)):
             raise ValueError('IP is outside the network')
-        super(models.Model, self).save(force_insert, force_update, using, update_fields)
+        super(DHCPIp, self).save(force_insert, force_update, using, update_fields)
 
     def get_network(self):
         router = self.ip.network.router.split(DHCP_IP_LIST_SEPARATOR)[0]
@@ -162,8 +164,8 @@ class DHCPUser(models.Model):
     name = models.CharField(max_length=32, blank=True, null=True, help_text='For helping to understand')
     address = models.CharField(max_length=20, primary_key=True)
     static = models.BooleanField(default=False)
-    ip = models.ForeignKey(DHCPip, null=True, blank=True)
-    options = models.ManyToManyField(DHCPOption)
+    ip = models.ForeignKey(DHCPIp, null=True, blank=True)
+    options = models.ManyToManyField(DHCPOption, blank=True, null=True)
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if self.static:
@@ -199,7 +201,7 @@ class DHCPUser(models.Model):
                             break
                     if not inside_net:
                         raise ValueError('IP is outside the network')
-        super(models.Model, self).save(force_insert, force_update, using, update_fields)
+        super(DHCPUser, self).save(force_insert, force_update, using, update_fields)
 
     @property
     def subnet_mask(self):
@@ -338,11 +340,11 @@ class DHCPUser(models.Model):
                         if ip in routers:
                             continue
                         try:
-                            next_ip = DHCPip.objects.get(address=str(ip), network=candidate.ip.network)
+                            next_ip = DHCPIp.objects.get(address=str(ip), network=candidate.ip.network)
                             if first_candidate is None and DHCPHistory.has_available(next_ip):
                                 first_candidate = next_ip
-                        except DHCPip.DoesNotExist:
-                            self.ip = DHCPip.objects.create(address=str(ip), network=candidate.ip.network)
+                        except DHCPIp.DoesNotExist:
+                            self.ip = DHCPIp.objects.create(address=str(ip), network=candidate.ip.network)
                             found = True
                             break
                     if found:
@@ -360,10 +362,8 @@ class DHCPUser(models.Model):
         return found
 
 
-
-
 class DHCPHistory(models.Model):
-    ip = models.ForeignKey(DHCPip)
+    ip = models.ForeignKey(DHCPIp)
     mac = models.ForeignKey(DHCPUser)
     date = models.DateTimeField(auto_now_add=True)
 
@@ -375,7 +375,7 @@ class DHCPHistory(models.Model):
     def has_available(ip):
         """
         :param ip: Ip asking for
-        :type ip: DHCPip
+        :type ip: DHCPIp
         :return: If this IP ar available for assigned to new user
         """
         user = DHCPHistory.who_is(ip)
@@ -391,7 +391,7 @@ class DHCPHistory(models.Model):
     def who_is(ip, last=False):
         """
         :param ip: Ip asking for
-        :type ip: DHCPip
+        :type ip: DHCPIp
         :param last: If ip has expired, return last user assigned
         :type last: Boolean
         :return: DHCPUser or None

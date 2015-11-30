@@ -47,10 +47,10 @@ def response(pkg, mac, ip, stdout=None, stderr=None):
                 stdout.write('New DHCP request %(mac)s\n' % {'mac': pkg.src})
         else:
             return
-        dhcp_pkg = Ether(src=mac, dst=pkg.src)/\
-                   IP(src=ip, dst=client_ip)/\
-                   UDP(sport=67, dport=68)/\
-                   BOOTP(op=2, yiaddr=client_ip, siaddr=ip, giaddr='0.0.0.0', xid=pkg[BOOTP].xid)/\
+        dhcp_pkg = Ether(src=mac, dst=pkg.src) / \
+                   IP(src=ip, dst=client_ip) / \
+                   UDP(sport=67, dport=68) / \
+                   BOOTP(op=2, yiaddr=client_ip, siaddr=ip, giaddr='0.0.0.0', xid=pkg[BOOTP].xid) / \
                    DHCP(options=dhcp_options)
         sendp(dhcp_pkg)
         if stdout:
