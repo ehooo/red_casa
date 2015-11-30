@@ -66,22 +66,18 @@ DATABASE_ROUTERS = ['powerdns_manager.routers.PowerdnsManagerDbRouter', 'red_cas
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    },
-    'postgresql': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'red_casa',
-        'USER': 'root',
-        'PASSWORD': 'toor',
+        'USER': 'red_casa',
+        'PASSWORD': 'red_casa',
         'HOST': 'localhost',
         'PORT': '5432',
     },
     'powerdns': {  # Used by django-powerdns-manager and PowerDNS server
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'powerdns',
-        'USER': 'root',
-        'PASSWORD': 'toor',
+        'NAME': 'pdns',
+        'USER': 'pdns',
+        'PASSWORD': 'red_casa',
         'HOST': 'localhost',
         'PORT': '5432',
     }
