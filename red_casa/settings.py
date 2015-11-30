@@ -36,6 +36,7 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_mqtt.mosquitto.auth_plugin',
     'red_casa.dhcp',
     # 'red_casa.dns',
 )
@@ -54,6 +55,7 @@ ROOT_URLCONF = 'red_casa.urls'
 
 WSGI_APPLICATION = 'red_casa.wsgi.application'
 
+MQTT_CERTS_ROOT = os.path.join(BASE_DIR, 'certs')
 
 # Database
 # https://docs.djangoproject.com/en/1.7/ref/settings/#databases

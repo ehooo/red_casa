@@ -1,3 +1,4 @@
 django
 ipaddr
 scapy
+git+https://github.com/ehooo/django_mqtt.git
