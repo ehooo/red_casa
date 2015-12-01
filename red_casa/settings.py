@@ -24,7 +24,7 @@ DEBUG = True
 
 TEMPLATE_DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -37,9 +37,8 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_mqtt.mosquitto.auth_plugin',
-    'powerdns_manager',
     'red_casa.dhcp',
-    # 'red_casa.dns',
+    'red_casa.dns',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -60,7 +59,7 @@ MQTT_CERTS_ROOT = os.path.join(BASE_DIR, 'certs')
 
 # Database
 # https://docs.djangoproject.com/en/1.7/ref/settings/#databases
-DATABASE_ROUTERS = ['powerdns_manager.routers.PowerdnsManagerDbRouter', 'red_casa.router.DatabaseAppsRouter']
+DATABASE_ROUTERS = ['red_casa.router.DatabaseAppsRouter']
 # DATABASE_APPS_MAPPING = {'red_casa.dhcp': 'postgresql'}
 
 
@@ -69,14 +68,6 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'red_casa',
         'USER': 'red_casa',
-        'PASSWORD': 'red_casa',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    },
-    'powerdns': {  # Used by django-powerdns-manager and PowerDNS server
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'pdns',
-        'USER': 'pdns',
         'PASSWORD': 'red_casa',
         'HOST': 'localhost',
         'PORT': '5432',

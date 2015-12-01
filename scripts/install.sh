@@ -10,15 +10,12 @@ sudo apt-get install nginx supervisor gunicorn -y
 echo "Install Database"
 sudo apt-get install libpq-dev postgresql postgresql-client postgresql-contrib -y
 
-echo "Install PowerDNS"
-sudo apt-get install pdns-server pdns-backend-pgsql pdns-recursor -y
-
 echo "Install dependencies"
+virtualenv env
 git clone https://github.com/ehooo/django_mqtt.git
 bash django_mqtt/script/install_mosquitto_auth_plugin.sh
 env/bin/pip install -r django_mqtt/requirements.txt
 mr django_mqtt -fr
-virtualenv env
 env/bin/pip install pip --upgrade
 env/bin/pip install -r requirements.txt
 
@@ -63,7 +60,7 @@ echo "server {
     }
 }" > nginx.conf
 sudo cp nginx.conf /etc/nginx/sites-available/django_red_casa
-sudo ln -s /etc/nginx/sites-available/django_mqtt /etc/nginx/sites-enabled/django_red_casa
+sudo ln -s /etc/nginx/sites-available/django_red_casa /etc/nginx/sites-enabled/django_red_casa
 sudo rm /etc/nginx/sites-enabled/default
 rm nginx.conf
 

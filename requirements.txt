@@ -1,5 +1,6 @@
 django
 ipaddr
 scapy
+psycopg2
 git+https://github.com/ehooo/django_mqtt.git
-hg+https://bitbucket.org/gnotaras/django-powerdns-manager#egg=django-powerdns-manager
+libdns
