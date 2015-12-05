@@ -145,7 +145,7 @@ class Command(BaseCommand):
             else:
                 self.response_tcp(conn, addr, self.dns_reply)
         else:
-            with True:
+            while True:
                 raw_query, addr = sock.recvfrom(1024)
 
                 def process_udp(raw_query, addr):
