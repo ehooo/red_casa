@@ -5,6 +5,8 @@ from django.conf import settings
 from django.utils.encoding import get_system_encoding, force_text
 from django.core.management.base import BaseCommand, CommandError
 
+from red_casa.dns import models
+
 from dnslib import *
 from datetime import datetime
 import threading
@@ -129,7 +131,7 @@ class Command(BaseCommand):
                 self.stdout.write(shutdown_message)
             sys.exit(0)
 
-    def server(self, in_threading, tcp):  # TODO soporte tcp
+    def server(self, in_threading, tcp):
         sock_type = socket.SOCK_DGRAM
         if tcp:
             sock_type = socket.SOCK_STREAM
@@ -151,13 +153,19 @@ class Command(BaseCommand):
         recived = DNSRecord.parse(raw_query)
         emiter = recived.reply()
         for query in recived.questions:
-            # TODO hacer consulta a la DB antes el reply
-            q = DNSRecord()
-            q.add_question(DNSRecord.question(query.qname, query.qtype, query.qclass))
-            query_answer = DNSRecord.parse(q.send(dns_reply))
-            for response in query_answer.rr:
-                if response.rname == query.qname and response.rtype == query.qtype:
-                    emiter.add_answer(RR(query.qname, response.rtype, rdata=response.rdata))
-                    break
+            try:
+                dbdata = models.DNSRecord.objects.get(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
+                emiter.add_answer(RR(query.qname, query.qtype, rdata=dbdata.rdata))
+            except models.DNSRecord.DoesNotExist:
+                dbdata = models.DNSRecord.objects.create(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
+                q = DNSRecord()
+                q.add_question(DNSRecord.question(query.qname, query.qtype, query.qclass))
+                query_answer = DNSRecord.parse(q.send(dns_reply))
+                for response in query_answer.rr:
+                    if response.rname == query.qname and response.rtype == query.qtype:
+                        emiter.add_answer(RR(query.qname, query.qtype, rdata=response.rdata))
+                        dbdata.rdata = response.rdata
+                        dbdata.save()
+                        break
         conn.sendall(emiter.pack())
         conn.close()

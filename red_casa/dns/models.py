@@ -1,4 +1,15 @@
 from django.db import models
-from django.utils.translation import ugettext_lazy as _
+from dnslib.dns import QTYPE, CLASS
 
 
+class DNSRecord(models.Model):
+    qname = models.CharField(max_length=512)
+    qtype = models.IntegerField()
+    qclass = models.IntegerField()
+    rdata = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('qname', 'qtype', 'qclass')
+
+    def __unicode__(self):
+        return "%s %s %s" % (self.qname, QTYPE.get(self.qtype), CLASS.get(self.qclass))

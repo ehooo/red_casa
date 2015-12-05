@@ -70,8 +70,7 @@ def get_dhcp_options(dhcp_type, mac, ip):
         if user.search_ip():
             ops = user.gen_options(dhcp_type, server_id=ip)
         else:
-            # TODO ver si se no ha asignado por no tener historial previo
-            # o si hay que buscar una red por defecto para generar las IPs de esa red
+            # TODO  buscar una red por defecto para generar las IPs de esa red
             return None, ops
     return user.ip.address, ops
 
