@@ -158,7 +158,6 @@ class Command(BaseCommand):
                 else:
                     process_udp(raw_query, addr, self.dns_reply)
 
-
     def response_udp(self, raw_query, addr, dns_reply):
         recived = DNSRecord.parse(raw_query)
         emiter = recived.reply()
@@ -169,7 +168,7 @@ class Command(BaseCommand):
             except models.DNSRecord.DoesNotExist:
                 dbdata = models.DNSRecord.objects.create(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
                 q = DNSRecord()
-                q.add_question(DNSRecord.question(query.qname, query.qtype, query.qclass))
+                q.add_question(DNSRecord.question(query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass)))
                 query_answer = DNSRecord.parse(q.send(dns_reply))
                 for response in query_answer.rr:
                     if response.rname == query.qname and response.rtype == query.qtype:
