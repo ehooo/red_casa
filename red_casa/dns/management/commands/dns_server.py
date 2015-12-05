@@ -151,26 +151,33 @@ class Command(BaseCommand):
                 def process_udp(raw_query, addr):
                     emiter = self.response_udp(raw_query, addr, self.dns_reply)
                     emiter.send(addr)
+
                 if in_threading:
                     process_udp(raw_query, addr)
                 if in_threading:
-                    threading.Thread(target=process_udp, args=(raw_query, addr, self.dns_reply)).start()
+                    threading.Thread(target=process_udp, args=(raw_query, addr)).start()
                 else:
-                    process_udp(raw_query, addr, self.dns_reply)
+                    process_udp(raw_query, addr)
 
     def response_udp(self, raw_query, addr, dns_reply):
+        self.stdout.write("Recived query from %s" % addr)
         recived = DNSRecord.parse(raw_query)
         emiter = recived.reply()
         for query in recived.questions:
+            self.stdout.write("Query name=%s type=%s class=%s" % (query.qname, query.qtype, query.qclass))
             try:
                 dbdata = models.DNSRecord.objects.get(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
                 emiter.add_answer(RR(query.qname, query.qtype, rdata=dbdata.rdata))
+                self.stdout.write("Data from DD %s" % dbdata.rdata)
             except models.DNSRecord.DoesNotExist:
                 dbdata = models.DNSRecord.objects.create(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
+                self.stdout.write("Asking to %s" % dns_reply)
                 q = DNSRecord()
                 q.add_question(DNSRecord.question(query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass)))
                 query_answer = DNSRecord.parse(q.send(dns_reply))
                 for response in query_answer.rr:
+                    self.stdout.write("Recuived name=%s query=%s class=%s" %
+                                      (response.rname, response.rtype, response.rdata))
                     if response.rname == query.qname and response.rtype == query.qtype:
                         emiter.add_answer(RR(query.qname, query.qtype, rdata=response.rdata))
                         dbdata.rdata = response.rdata
