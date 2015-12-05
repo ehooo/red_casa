@@ -166,17 +166,20 @@ class Command(BaseCommand):
         for query in recived.questions:
             self.stdout.write("Query name=%s type=%s class=%s" %
                               (query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass)))
+            make_query = False
             try:
                 dbdata = models.DNSRecord.objects.get(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
-                if dbdata.always_reply:
-                    raise models.DNSRecord.DoesNotExist
+                make_query = dbdata.always_reply
+            except models.DNSRecord.DoesNotExist:
+                dbdata = models.DNSRecord.objects.create(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
+                make_query = True
+            if not make_query:
                 if dbdata.rdata:
                     emiter.add_answer(RR(query.qname, query.qtype, rdata=dbdata.rdata))
                     self.stdout.write("Data from DB %s" % dbdata.rdata)
                 else:
                     self.stdout.write("No data from DB")
-            except models.DNSRecord.DoesNotExist:
-                dbdata = models.DNSRecord.objects.create(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
+            else:
                 self.stdout.write("Asking to %s" % dns_reply)
                 q = DNSRecord()
                 q.add_question(DNSRecord.question(query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass)))
