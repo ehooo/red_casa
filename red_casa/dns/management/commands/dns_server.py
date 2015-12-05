@@ -150,7 +150,7 @@ class Command(BaseCommand):
 
                 def process_udp(raw_query, addr):
                     emiter = self.response_udp(raw_query, addr, self.dns_reply)
-                    emiter.send(addr)
+                    emiter.send(addr[0])
 
                 if in_threading:
                     process_udp(raw_query, addr)
