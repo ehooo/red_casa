@@ -3,4 +3,4 @@ ipaddr
 scapy
 psycopg2
 git+https://github.com/ehooo/django_mqtt.git
-libdns
+dnslib
