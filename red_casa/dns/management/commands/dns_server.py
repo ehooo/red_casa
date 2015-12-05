@@ -160,7 +160,7 @@ class Command(BaseCommand):
                     process_udp(raw_query, addr)
 
     def response_udp(self, raw_query, addr, dns_reply):
-        self.stdout.write("Recived query from %s" % addr)
+        self.stdout.write("Received query from %s:%s" % addr)
         recived = DNSRecord.parse(raw_query)
         emiter = recived.reply()
         for query in recived.questions:
