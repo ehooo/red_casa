@@ -164,12 +164,13 @@ class Command(BaseCommand):
         recived = DNSRecord.parse(raw_query)
         emiter = recived.reply()
         for query in recived.questions:
-            self.stdout.write("Query name=%s type=%s class=%s" % (query.qname, query.qtype, query.qclass))
+            self.stdout.write("Query name=%s type=%s class=%s" %
+                              (query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass)))
             try:
                 dbdata = models.DNSRecord.objects.get(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
                 if dbdata.always_reply:
                     raise models.DNSRecord.DoesNotExist
-                if not dbdata.rdata:
+                if dbdata.rdata:
                     emiter.add_answer(RR(query.qname, query.qtype, rdata=dbdata.rdata))
                     self.stdout.write("Data from DB %s" % dbdata.rdata)
                 else:
@@ -182,9 +183,10 @@ class Command(BaseCommand):
                 query_answer = DNSRecord.parse(q.send(dns_reply))
                 for response in query_answer.rr:
                     self.stdout.write("Recuived name=%s query=%s class=%s" %
-                                      (response.rname, response.rtype, response.rdata))
+                                      (response.rname, dns.CLASS.get(response.rtype), response.rdata))
                     if response.rname == query.qname and response.rtype == query.qtype:
-                        emiter.add_answer(RR(query.qname, query.qtype, rdata=response.rdata))
+                        emiter.add_answer(RR(response.rname,  dns.QTYPE.get(response.rtype),
+                                             dns.CLASS.get(response.rclass), rdata=response.rdata))
                         dbdata.rdata = response.rdata
                         dbdata.save()
                         break
