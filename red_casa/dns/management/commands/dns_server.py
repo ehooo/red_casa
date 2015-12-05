@@ -111,7 +111,7 @@ class Command(BaseCommand):
         })
 
         try:
-            self.server(in_threading, tcp, dns_reply)
+            self.server(in_threading, tcp, self.dns_reply)
         except socket.error as e:
             # Use helpful error messages instead of ugly tracebacks.
             ERRORS = {
