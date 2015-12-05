@@ -167,8 +167,13 @@ class Command(BaseCommand):
             self.stdout.write("Query name=%s type=%s class=%s" % (query.qname, query.qtype, query.qclass))
             try:
                 dbdata = models.DNSRecord.objects.get(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
-                emiter.add_answer(RR(query.qname, query.qtype, rdata=dbdata.rdata))
-                self.stdout.write("Data from DD %s" % dbdata.rdata)
+                if dbdata.always_reply:
+                    raise models.DNSRecord.DoesNotExist
+                if not dbdata.rdata:
+                    emiter.add_answer(RR(query.qname, query.qtype, rdata=dbdata.rdata))
+                    self.stdout.write("Data from DB %s" % dbdata.rdata)
+                else:
+                    self.stdout.write("No data from DB")
             except models.DNSRecord.DoesNotExist:
                 dbdata = models.DNSRecord.objects.create(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
                 self.stdout.write("Asking to %s" % dns_reply)

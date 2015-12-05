@@ -7,6 +7,7 @@ class DNSRecord(models.Model):
     qtype = models.IntegerField()
     qclass = models.IntegerField()
     rdata = models.TextField(null=True, blank=True)
+    always_reply = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('qname', 'qtype', 'qclass')
