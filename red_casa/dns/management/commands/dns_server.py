@@ -139,18 +139,27 @@ class Command(BaseCommand):
         sock.bind((self.addr, int(self.port)))
         if tcp:
             sock.listen(1)
-        conn, addr = sock.accept()
-        if in_threading:
-            threading.Thread(target=self.response, args=(conn, addr, self.dns_reply)).start()
+            conn, addr = sock.accept()
+            if in_threading:
+                threading.Thread(target=self.response_tcp, args=(conn, addr, self.dns_reply)).start()
+            else:
+                self.response_tcp(conn, addr, self.dns_reply)
         else:
-            self.response(conn, addr, self.dns_reply)
+            with True:
+                raw_query, addr = sock.recvfrom(1024)
 
-    def response(self, conn, addr, dns_reply):
-        raw_query = ''
-        data = conn.recv(1024)
-        while data:
-            raw_query += data
-            data = conn.recv(1024)
+                def process_udp(raw_query, addr):
+                    emiter = self.response_udp(raw_query, addr, self.dns_reply)
+                    emiter.send(addr)
+                if in_threading:
+                    process_udp(raw_query, addr)
+                if in_threading:
+                    threading.Thread(target=process_udp, args=(raw_query, addr, self.dns_reply)).start()
+                else:
+                    process_udp(raw_query, addr, self.dns_reply)
+
+
+    def response_udp(self, raw_query, addr, dns_reply):
         recived = DNSRecord.parse(raw_query)
         emiter = recived.reply()
         for query in recived.questions:
@@ -168,5 +177,14 @@ class Command(BaseCommand):
                         dbdata.rdata = response.rdata
                         dbdata.save()
                         break
+        return emiter
+
+    def response_tcp(self, conn, addr, dns_reply):
+        raw_query = ''
+        data = conn.recv(1024)
+        while data:
+            raw_query += data
+            data = conn.recv(1024)
+        emiter = self.response_udp(data, addr, dns_reply)
         conn.sendall(emiter.pack())
         conn.close()
