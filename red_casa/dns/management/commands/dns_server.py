@@ -137,7 +137,8 @@ class Command(BaseCommand):
             sock_type = socket.SOCK_STREAM
         sock = socket.socket(socket.AF_INET, sock_type)
         sock.bind((self.addr, int(self.port)))
-        sock.listen(1)
+        if tcp:
+            sock.listen(1)
         conn, addr = sock.accept()
         if in_threading:
             threading.Thread(target=self.response, args=(conn, addr, self.dns_reply)).start()
