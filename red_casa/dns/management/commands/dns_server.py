@@ -132,6 +132,12 @@ class Command(BaseCommand):
             sys.exit(0)
 
     def server(self, in_threading, tcp):
+        def process_udp(raw_query, addr, dns_reply):
+            emiter = self.response_udp(raw_query, addr, dns_reply)
+            self.stdout.write("Responding to %s -> %s" % (addr, emiter))
+            emiter.send(addr[0])
+            self.stdout.write("Response send")
+
         sock_type = socket.SOCK_DGRAM
         if tcp:
             sock_type = socket.SOCK_STREAM
@@ -147,17 +153,10 @@ class Command(BaseCommand):
         else:
             while True:
                 raw_query, addr = sock.recvfrom(1024)
-
-                def process_udp(raw_query, addr):
-                    emiter = self.response_udp(raw_query, addr, self.dns_reply)
-                    emiter.send(addr[0])
-
                 if in_threading:
-                    process_udp(raw_query, addr)
-                if in_threading:
-                    threading.Thread(target=process_udp, args=(raw_query, addr)).start()
+                    threading.Thread(target=process_udp, args=(raw_query, addr, self.dns_reply)).start()
                 else:
-                    process_udp(raw_query, addr)
+                    process_udp(raw_query, addr, self.dns_reply)
 
     def response_udp(self, raw_query, addr, dns_reply):
         self.stdout.write("Received query from %s:%s" % addr)
@@ -191,7 +190,7 @@ class Command(BaseCommand):
                         emiter.add_answer(RR(response.rname,  response.rtype, response.rclass, rdata=response.rdata))
                         dbdata.rdata = response.rdata
                         dbdata.save()
-                        break
+                        # break
         return emiter
 
     def response_tcp(self, conn, addr, dns_reply):
