@@ -188,8 +188,7 @@ class Command(BaseCommand):
                                       (response.rname, dns.QTYPE.get(response.rtype),
                                        dns.CLASS.get(response.rtype), response.rdata))
                     if response.rname == query.qname and response.rtype == query.qtype:
-                        emiter.add_answer(RR(response.rname,  dns.QTYPE.get(response.rtype),
-                                             dns.CLASS.get(response.rclass), rdata=response.rdata))
+                        emiter.add_answer(RR(response.rname,  response.rtype, response.rclass, rdata=response.rdata))
                         dbdata.rdata = response.rdata
                         dbdata.save()
                         break
