@@ -181,12 +181,12 @@ class Command(BaseCommand):
                     self.stdout.write("No data from DB")
             else:
                 self.stdout.write("Asking to %s" % dns_reply)
-                q = DNSRecord()
-                q.add_question(DNSRecord.question(query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass)))
+                q = DNSRecord.question(query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass))
                 query_answer = DNSRecord.parse(q.send(dns_reply))
                 for response in query_answer.rr:
-                    self.stdout.write("Recuived name=%s query=%s class=%s" %
-                                      (response.rname, dns.CLASS.get(response.rtype), response.rdata))
+                    self.stdout.write("Received name=%s query=%s class=%s rdata=%s" %
+                                      (response.rname, dns.QTYPE.get(response.rtype),
+                                       dns.CLASS.get(response.rtype), response.rdata))
                     if response.rname == query.qname and response.rtype == query.qtype:
                         emiter.add_answer(RR(response.rname,  dns.QTYPE.get(response.rtype),
                                              dns.CLASS.get(response.rclass), rdata=response.rdata))
