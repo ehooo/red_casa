@@ -135,7 +135,7 @@ class Command(BaseCommand):
         def process_udp(raw_query, addr, dns_reply):
             emiter = self.response_udp(raw_query, addr, dns_reply)
             self.stdout.write("Responding to %s -> %s" % (addr, emiter))
-            emiter.send(addr[0])
+            emiter.send(addr[0], addr[1])
             self.stdout.write("Response send")
 
         sock_type = socket.SOCK_DGRAM
