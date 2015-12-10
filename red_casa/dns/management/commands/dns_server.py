@@ -168,7 +168,11 @@ class Command(BaseCommand):
                 make_query = True
             if not make_query:
                 if dbdata.rdata:
-                    if dns.QTYPE.get(query.qtype) in RDMAP:
+                    if dns.QTYPE.get(query.qtype) == 'MX':
+                        preference, label = dbdata.rdata.split(' ', 1)
+                        emiter.add_answer(RR(query.qname, query.qtype,
+                                             rdata=MX(label, preference)))
+                    elif dns.QTYPE.get(query.qtype) in RDMAP:
                         emiter.add_answer(RR(query.qname, query.qtype,
                                              rdata=RDMAP[dns.QTYPE.get(query.qtype)](dbdata.rdata)))
                         self.stdout.write("Data from DB %s" % dbdata.rdata)
