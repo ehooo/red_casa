@@ -34,7 +34,7 @@ if hasattr(settings, 'DEFAULT_DNS_PORT'):
 
 class Command(BaseCommand):
     help = 'Create a debug dns server'
-    dns_reply = None
+    dns_reply = DEFAULT_REPLY_DNS
 
     def add_arguments(self, parser):
         parser.add_argument('addrport', nargs='?',
@@ -132,12 +132,6 @@ class Command(BaseCommand):
             sys.exit(0)
 
     def server(self, in_threading, tcp):
-        def process_udp(raw_query, addr, dns_reply):
-            emiter = self.response_udp(raw_query, addr, dns_reply)
-            self.stdout.write("Responding to %s -> %s" % (addr, emiter))
-            emiter.send(addr[0], addr[1])
-            self.stdout.write("Response send")
-
         sock_type = socket.SOCK_DGRAM
         if tcp:
             sock_type = socket.SOCK_STREAM
@@ -147,18 +141,18 @@ class Command(BaseCommand):
             sock.listen(1)
             conn, addr = sock.accept()
             if in_threading:
-                threading.Thread(target=self.response_tcp, args=(conn, addr, self.dns_reply)).start()
+                threading.Thread(target=self.response_tcp, args=(conn, addr)).start()
             else:
-                self.response_tcp(conn, addr, self.dns_reply)
+                self.response_tcp(conn, addr)
         else:
             while True:
                 raw_query, addr = sock.recvfrom(1024)
                 if in_threading:
-                    threading.Thread(target=process_udp, args=(raw_query, addr, self.dns_reply)).start()
+                    threading.Thread(target=self.response_udp, args=(sock, raw_query, addr)).start()
                 else:
-                    process_udp(raw_query, addr, self.dns_reply)
+                    self.response_udp(sock, raw_query, addr)
 
-    def response_udp(self, raw_query, addr, dns_reply):
+    def get_response(self, raw_query, addr):
         self.stdout.write("Received query from %s:%s" % addr)
         recived = DNSRecord.parse(raw_query)
         emiter = recived.reply()
@@ -183,9 +177,9 @@ class Command(BaseCommand):
                 else:
                     self.stderr.write("No data from DB")
             else:
-                self.stdout.write("Asking to %s" % dns_reply)
+                self.stdout.write("Asking to %s" % self.dns_reply)
                 q = DNSRecord.question(query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass))
-                query_answer = DNSRecord.parse(q.send(dns_reply))
+                query_answer = DNSRecord.parse(q.send(self.dns_reply))
                 for response in query_answer.rr:
                     self.stdout.write("Received name=%s query=%s class=%s rdata=%s" %
                                       (response.rname, dns.QTYPE.get(response.rtype),
@@ -197,12 +191,16 @@ class Command(BaseCommand):
                         # break
         return emiter
 
-    def response_tcp(self, conn, addr, dns_reply):
+    def response_udp(self, sock, raw_query, addr):
+        emiter = self.get_response(raw_query, addr)
+        sock.sendto(emiter.pack(), addr)
+
+    def response_tcp(self, conn, addr):
         raw_query = ''
         data = conn.recv(1024)
         while data:
             raw_query += data
             data = conn.recv(1024)
-        emiter = self.response_udp(data, addr, dns_reply)
+        emiter = self.get_response(data, addr)
         conn.sendall(emiter.pack())
         conn.close()
