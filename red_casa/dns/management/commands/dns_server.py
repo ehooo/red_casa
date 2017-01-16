@@ -10,11 +10,14 @@ from red_casa.dns import models
 from dnslib import *
 from datetime import datetime
 import threading
+import logging
 import socket
 import errno
 import sys
 import re
 
+
+logger = logging.getLogger('dns_server')
 
 naiveip_re = re.compile(r"""^(?:
 (?P<addr>
@@ -27,14 +30,37 @@ DEFAULT_REPLY_DNS = '8.8.8.8'
 if hasattr(settings, 'DEFAULT_REPLY_DNS'):
     DEFAULT_REPLY_DNS = settings.DEFAULT_REPLY_DNS
 
-DEFAULT_DNS_PORT = '5353'
+DEFAULT_DNS_PORT = 53
 if hasattr(settings, 'DEFAULT_DNS_PORT'):
-    DEFAULT_DNS_PORT = settings.DEFAULT_DNS_PORT
+    DEFAULT_DNS_PORT = int(settings.DEFAULT_DNS_PORT)
+
+DEFAULT_DNS_PACKET_SIZE = 512
+if hasattr(settings, 'DEFAULT_DNS_PACKET_SIZE'):
+    size = settings.DEFAULT_DNS_PACKET_SIZE
+    if isinstance(size, six.string_types):
+        size = size.upper()
+        if size in ['RFC 1035', 'RFC-1035', 'RFC1035']:
+            DEFAULT_DNS_PACKET_SIZE = 512  # According RFC 1035
+        elif size in ['RFC 2535', 'RFC-2535', 'RFC2535']:
+            DEFAULT_DNS_PACKET_SIZE = 4000  # According RFC 3226
+        elif size in ['RFC 2874', 'RFC-2874', 'RFC2874']:
+            DEFAULT_DNS_PACKET_SIZE = 2048  # According RFC 3226
+        else:
+            DEFAULT_DNS_PACKET_SIZE = int(size)
+    else:
+        DEFAULT_DNS_PACKET_SIZE = int(size)
 
 
 class Command(BaseCommand):
     help = 'Create a debug dns server'
-    dns_reply = DEFAULT_REPLY_DNS
+
+    def __init__(self, stdout=None, stderr=None, no_color=False):
+        super(Command, self).__init__(stdout=stdout, stderr=stderr, no_color=no_color)
+        self.addr = ''
+        self.port = DEFAULT_DNS_PORT
+        self.use_ipv6 = False
+        self._raw_ipv6 = bool(self.use_ipv6)
+        self.dns_reply = DEFAULT_REPLY_DNS
 
     def add_arguments(self, parser):
         parser.add_argument('addrport', nargs='?',
@@ -61,10 +87,7 @@ class Command(BaseCommand):
         if self.use_ipv6 and not socket.has_ipv6:
             raise CommandError('Your Python does not support IPv6.')
         self._raw_ipv6 = False
-        if not options.get('addrport'):
-            self.addr = ''
-            self.port = DEFAULT_DNS_PORT
-        else:
+        if options.get('addrport'):
             m = re.match(naiveip_re, options['addrport'])
             if m is None:
                 raise CommandError('"%s" is not a valid port number '
@@ -82,7 +105,7 @@ class Command(BaseCommand):
         if not self.addr:
             self.addr = '::1' if self.use_ipv6 else '127.0.0.1'
             self._raw_ipv6 = bool(self.use_ipv6)
-        self.run(**options)
+        self.run(*args, **options)
 
     def run(self, *args, **options):
         in_threading = options.get('use_threading')
@@ -137,6 +160,7 @@ class Command(BaseCommand):
             sock_type = socket.SOCK_STREAM
         sock = socket.socket(socket.AF_INET, sock_type)
         sock.bind((self.addr, int(self.port)))
+        # TODO change permissions if it's running as root
         if tcp:
             sock.listen(1)
             conn, addr = sock.accept()
@@ -146,7 +170,7 @@ class Command(BaseCommand):
                 self.response_tcp(conn, addr)
         else:
             while True:
-                raw_query, addr = sock.recvfrom(1024)
+                raw_query, addr = sock.recvfrom(DEFAULT_DNS_PACKET_SIZE)
                 if in_threading:
                     threading.Thread(target=self.response_udp, args=(sock, raw_query, addr)).start()
                 else:
@@ -154,50 +178,60 @@ class Command(BaseCommand):
 
     def get_response(self, raw_query, addr):
         self.stdout.write("Received query from %s:%s" % addr)
-        recived = DNSRecord.parse(raw_query)
-        emiter = recived.reply()
-        for query in recived.questions:
-            self.stdout.write("Query name=%s type=%s class=%s" %
-                              (query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass)))
-            make_query = False
+        received = DNSRecord.parse(raw_query)
+        emitter = received.reply()
+        for query in received.questions:
+            logger.info("Query name=%s type=%s class=%s" %
+                        (query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass)))
+            is_new = False
             try:
                 dbdata = models.DNSRecord.objects.get(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
-                make_query = dbdata.always_reply
             except models.DNSRecord.DoesNotExist:
                 dbdata = models.DNSRecord.objects.create(qname=query.qname, qtype=query.qtype, qclass=query.qclass)
-                make_query = True
-            if not make_query:
+                is_new = True
+            if dbdata.is_locked:
+                if is_new:
+                    dbdata.always_reply = dbdata.is_relay
+                    dbdata.lock = True
+                dbdata.save()  # Update last_query
+                return None
+            elif not dbdata.is_relay:
+                if is_new:
+                    dbdata.always_reply = False
                 if dbdata.rdata:
                     if dns.QTYPE.get(query.qtype) == 'MX':
                         preference, label = dbdata.rdata.split(' ', 1)
-                        emiter.add_answer(RR(query.qname, query.qtype,
-                                             rdata=MX(label, int(preference))))
+                        emitter.add_answer(RR(query.qname, query.qtype,
+                                              rdata=MX(label, int(preference))))
                     elif dns.QTYPE.get(query.qtype) in RDMAP:
-                        emiter.add_answer(RR(query.qname, query.qtype,
-                                             rdata=RDMAP[dns.QTYPE.get(query.qtype)](dbdata.rdata)))
-                        self.stdout.write("Data from DB %s" % dbdata.rdata)
+                        emitter.add_answer(RR(query.qname, query.qtype,
+                                              rdata=RDMAP[dns.QTYPE.get(query.qtype)](dbdata.rdata)))
+                        logger.debug("Data cached %s" % dbdata.rdata)
                     else:
-                        self.stderr.write("Not supported type")
+                        logger.warn("Not supported type %s" % query.qtype)
                 else:
-                    self.stderr.write("No data from DB")
+                    logger.debug("No data in DB for %s" % dbdata.qname)
+                dbdata.save()  # Update last_query
             else:
-                self.stdout.write("Asking to %s" % self.dns_reply)
+                logger.debug("Asking to %s" % self.dns_reply)
                 q = DNSRecord.question(query.qname, dns.QTYPE.get(query.qtype), dns.CLASS.get(query.qclass))
                 query_answer = DNSRecord.parse(q.send(self.dns_reply))
                 for response in query_answer.rr:
-                    self.stdout.write("Received name=%s query=%s class=%s rdata=%s" %
-                                      (response.rname, dns.QTYPE.get(response.rtype),
-                                       dns.CLASS.get(response.rtype), response.rdata))
+                    logger.info("Caching name=%s query=%s class=%s rdata=%s" %
+                                (response.rname, dns.QTYPE.get(response.rtype),
+                                 dns.CLASS.get(response.rtype), response.rdata))
                     if response.rname == query.qname and response.rtype == query.qtype:
-                        emiter.add_answer(RR(response.rname,  response.rtype, response.rclass, rdata=response.rdata))
-                        dbdata.rdata = response.rdata
-                        dbdata.save()
+                        emitter.add_answer(RR(response.rname,  response.rtype, response.rclass, rdata=response.rdata))
+                        if response.rdata:
+                            dbdata.rdata = response.rdata
+                            dbdata.save()
                         # break
-        return emiter
+        return emitter
 
     def response_udp(self, sock, raw_query, addr):
-        emiter = self.get_response(raw_query, addr)
-        sock.sendto(emiter.pack(), addr)
+        emitter = self.get_response(raw_query, addr)
+        if emitter:
+            sock.sendto(emitter.pack(), addr)
 
     def response_tcp(self, conn, addr):
         raw_query = ''
@@ -205,6 +239,7 @@ class Command(BaseCommand):
         while data:
             raw_query += data
             data = conn.recv(1024)
-        emiter = self.get_response(data, addr)
-        conn.sendall(emiter.pack())
+        emitter = self.get_response(data, addr)
+        if emitter:
+            conn.sendall(emitter.pack())
         conn.close()

@@ -36,6 +36,7 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_mqtt',
     'django_mqtt.mosquitto.auth_plugin',
     'red_casa.dhcp',
     'red_casa.dns',
@@ -57,23 +58,6 @@ WSGI_APPLICATION = 'red_casa.wsgi.application'
 
 MQTT_CERTS_ROOT = os.path.join(BASE_DIR, 'certs')
 
-# Database
-# https://docs.djangoproject.com/en/1.7/ref/settings/#databases
-DATABASE_ROUTERS = ['red_casa.router.DatabaseAppsRouter']
-# DATABASE_APPS_MAPPING = {'red_casa.dhcp': 'postgresql'}
-
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'red_casa',
-        'USER': 'red_casa',
-        'PASSWORD': 'red_casa',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
-
 # Internationalization
 # https://docs.djangoproject.com/en/1.7/topics/i18n/
 
@@ -92,3 +76,20 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.7/howto/static-files/
 
 STATIC_URL = '/static/'
+
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [os.path.join(BASE_DIR,  'templates')],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]

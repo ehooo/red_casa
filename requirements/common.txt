@@ -1,6 +1,5 @@
-django
+django==1.9.1
 ipaddr
 scapy
-psycopg2
 git+https://github.com/ehooo/django_mqtt.git
 dnslib

@@ -17,7 +17,7 @@ bash django_mqtt/script/install_mosquitto_auth_plugin.sh
 env/bin/pip install -r django_mqtt/requirements.txt
 mr django_mqtt -fr
 env/bin/pip install pip --upgrade
-env/bin/pip install -r requirements.txt
+env/bin/pip install -r requirements/prod.txt
 
 echo "
 DJANGO_SETTINGS_MODULE=red_casa.settings
